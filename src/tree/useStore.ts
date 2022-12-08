@@ -34,6 +34,7 @@ export function useStore(props: TdTreeProps, refresh: () => void): TreeStore {
     filter,
     // onDataChange,
     onLoad,
+    onExpand,
     allowFoldNodeOnFilter = false,
   } = props;
 
@@ -165,6 +166,15 @@ export function useStore(props: TdTreeProps, refresh: () => void): TreeStore {
       store.setExpanded(expanded);
     }
   }, [data, store]);
+
+  useUpdateEffect(() => {
+    const context = {
+      node: storeRef.current.nullNodeModel,
+      e: null,
+    };
+
+    expandAll ? onExpand(Array.from(storeRef.current.nodeMap.keys()), context) : onExpand([], context);
+  }, [expandAll]);
 
   useUpdateEffect(() => {
     store.setConfig({
