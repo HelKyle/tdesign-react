@@ -15,12 +15,12 @@ import TimeRangePicker from './TimeRangePicker';
 import TimePickerPanel from './panel/TimePickerPanel';
 
 import { useTimePickerTextConfig } from './hooks/useTimePickerTextConfig';
-
-import { StyledProps } from '../common';
-import { TdTimePickerProps } from './type';
 import { formatInputValue, validateInputValue } from '../_common/js/time-picker/utils';
 import { DEFAULT_STEPS, DEFAULT_FORMAT } from '../_common/js/time-picker/const';
 import { timePickerDefaultProps } from './defaultProps';
+
+import type { StyledProps } from '../common';
+import type { TdTimePickerProps } from './type';
 
 // https://github.com/iamkun/dayjs/issues/1552
 dayjs.extend(customParseFormat);
@@ -118,7 +118,7 @@ const TimePicker = forwardRefWithStatics(
           placeholder={!value ? placeholder : undefined}
           value={isPanelShowed ? currentValue : value ?? undefined}
           inputValue={isPanelShowed ? currentValue : value ?? undefined}
-          inputProps={props.inputProps}
+          inputProps={{ ...props.inputProps, size: props.size }}
           popupProps={{ overlayInnerStyle: { width: 'auto', padding: 0 }, ...props.popupProps }}
           tips={props.tips}
           status={props.status}

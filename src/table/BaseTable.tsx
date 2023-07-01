@@ -16,7 +16,6 @@ import { BaseTableProps, BaseTableRef } from './interface';
 import useStyle, { formatCSSUnit } from './hooks/useStyle';
 import useClassName from './hooks/useClassName';
 import { getAffixProps } from './utils';
-import log from '../_common/js/log';
 import { baseTableDefaultProps } from './defaultProps';
 import { Styles } from '../common';
 import { TableRowData } from './type';
@@ -60,13 +59,14 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
     rowAndColFixedPosition,
     setData,
     refreshTable,
+    setTableElmWidth,
     emitScrollEvent,
     setUseFixedTableElmRef,
     updateColumnFixedShadow,
     getThWidthList,
     updateThWidthList,
-    setRecalculateColWidthFuncRef,
     addTableResizeObserver,
+    updateTableAfterColumnResize,
   } = useFixed(props, finalColumns);
 
   // 1. 表头吸顶；2. 表尾吸底；3. 底部滚动条吸底；4. 分页器吸底
@@ -86,9 +86,17 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
   const { dataSource, innerPagination, isPaginateData, renderPagination } = usePagination(props);
 
   // 列宽拖拽逻辑
-  const columnResizeParams = useColumnResize(tableContentRef, refreshTable, getThWidthList, updateThWidthList);
-  const { resizeLineRef, resizeLineStyle, recalculateColWidth, setEffectColMap } = columnResizeParams;
-  setRecalculateColWidthFuncRef(recalculateColWidth);
+  const columnResizeParams = useColumnResize({
+    isWidthOverflow,
+    tableContentRef,
+    showColumnShadow,
+    getThWidthList,
+    updateThWidthList,
+    setTableElmWidth,
+    updateTableAfterColumnResize,
+    onColumnResizeChange: props.onColumnResizeChange,
+  });
+  const { resizeLineRef, resizeLineStyle, setEffectColMap, updateTableWidthOnColumnChange } = columnResizeParams;
 
   const dynamicBaseTableClasses = classNames(
     tableClasses.concat({
@@ -132,19 +140,16 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
   }, [props.data, dataSource, isPaginateData]);
 
   const [lastLeafColumns, setLastLeafColumns] = useState(props.columns || []);
+
   useEffect(() => {
     if (lastLeafColumns.map((t) => t.colKey).join() !== spansAndLeafNodes.leafColumns.map((t) => t.colKey).join()) {
       props.onLeafColumnsChange?.(spansAndLeafNodes.leafColumns);
       // eslint-disable-next-line react-hooks/exhaustive-deps
       setLastLeafColumns(spansAndLeafNodes.leafColumns);
     }
+    setEffectColMap(spansAndLeafNodes.leafColumns, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spansAndLeafNodes.leafColumns]);
-
-  useEffect(() => {
-    setEffectColMap(thList[0], null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thList]);
 
   const onFixedChange = () => {
     const timer = setTimeout(() => {
@@ -171,13 +176,36 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
     emitScrollEvent(e);
   };
 
+  /**
+   * 横向滚动到指定列
+   * 对外暴露方法，修改时需谨慎（expose）
+   * @param colKey
+   * @returns
+   */
+  const scrollColumnIntoView = (colKey: string) => {
+    if (!tableContentRef.current) return;
+    const thDom = tableContentRef.current.querySelector(`th[data-colkey="${colKey}"]`);
+    const fixedThDom = tableContentRef.current.querySelectorAll('th.t-table__cell--fixed-left');
+    let totalWidth = 0;
+    for (let i = 0, len = fixedThDom.length; i < len; i++) {
+      totalWidth += fixedThDom[i].getBoundingClientRect().width;
+    }
+    const domRect = thDom.getBoundingClientRect();
+    const contentRect = tableContentRef.current.getBoundingClientRect();
+    const distance = domRect.left - contentRect.left - totalWidth;
+    tableContentRef.current.scrollTo({ left: distance, behavior: 'smooth' });
+  };
+
   useImperativeHandle(ref, () => ({
+    showColumnShadow,
     tableElement: tableRef.current,
     tableHtmlElement: tableElmRef.current,
     tableContentElement: tableContentRef.current,
     affixHeaderElement: affixHeaderRef.current,
     refreshTable,
     scrollToElement: virtualConfig.scrollToElement,
+    scrollColumnIntoView,
+    updateTableWidthOnColumnChange,
   }));
 
   // used for top margin
@@ -208,18 +236,11 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
 
   const newData = isPaginateData ? dataSource : data;
 
-  if (resizable && tableLayout === 'auto') {
-    log.warn('Table', 'table-layout can not be `auto` for resizable column table, set `table-layout: fixed` please.');
-  }
-
-  const defaultColWidth = props.tableLayout === 'fixed' && isWidthOverflow ? '100px' : undefined;
   const renderColGroup = (isFixedHeader = true) => (
     <colgroup>
       {finalColumns.map((col) => {
         const style: Styles = {
-          width:
-            formatCSSUnit((isFixedHeader || resizable ? thWidthList.current[col.colKey] : undefined) || col.width) ||
-            defaultColWidth,
+          width: formatCSSUnit((isFixedHeader || resizable ? thWidthList.current[col.colKey] : undefined) || col.width),
         };
         if (col.minWidth) {
           style.minWidth = formatCSSUnit(col.minWidth);
@@ -246,6 +267,9 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
     columnResizeParams,
     classPrefix,
     ellipsisOverlayClassName: props.size !== 'medium' ? sizeClassNames[props.size] : '',
+    attach: props.attach,
+    thDraggable: props.thDraggable,
+    showColumnShadow,
   };
 
   const headUseMemoDependencies = [
@@ -270,22 +294,24 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
    * Affixed Header
    */
   const renderFixedHeader = () => {
+    if (!props.showHeader) return null;
     // IE浏览器需要遮挡header吸顶滚动条，要减去getBoundingClientRect.height的滚动条高度4像素
     const IEHeaderWrap = getIEVersion() <= 11 ? 4 : 0;
     const barWidth = isWidthOverflow ? scrollbarWidth : 0;
+    const headerBarWidth = isFixedHeader ? scrollbarWidth : 0;
     const affixHeaderHeight = (affixHeaderRef.current?.getBoundingClientRect().height || 0) - IEHeaderWrap;
     const affixHeaderWrapHeight = affixHeaderHeight - barWidth;
     // 两类场景：1. 虚拟滚动，永久显示表头，直到表头消失在可视区域； 2. 表头吸顶，根据滚动情况判断是否显示吸顶表头
     const headerOpacity = headerAffixedTop ? Number(showAffixHeader) : 1;
     const affixHeaderWrapHeightStyle = {
-      width: `${tableWidth.current}px`,
+      width: `${tableWidth.current - headerBarWidth}px`,
       height: `${affixHeaderWrapHeight}px`,
       opacity: headerOpacity,
     };
     const affixedHeader = Boolean((props.headerAffixedTop || virtualConfig.isVirtualScroll) && tableWidth.current) && (
       <div
         ref={affixHeaderRef}
-        style={{ width: `${tableWidth.current - affixedLeftBorder}px`, opacity: headerOpacity }}
+        style={{ width: `${tableWidth.current - headerBarWidth - affixedLeftBorder}px`, opacity: headerOpacity }}
         className={classNames([
           'scrollbar',
           {
@@ -414,7 +440,17 @@ const BaseTable = forwardRef<BaseTableRef, BaseTableProps>((props, ref) => {
     >
       {virtualConfig.isVirtualScroll && <div className={virtualScrollClasses.cursor} style={virtualStyle} />}
 
-      <table ref={tableElmRef} className={classNames(tableElmClasses)} style={tableElementStyles}>
+      <table
+        ref={tableElmRef}
+        className={classNames(tableElmClasses)}
+        style={{
+          ...tableElementStyles,
+          width:
+            resizable && isWidthOverflow && tableElmWidth.current
+              ? `${tableElmWidth.current}px`
+              : tableElementStyles.width,
+        }}
+      >
         {renderColGroup(false)}
         {useMemo(() => {
           if (!props.showHeader) return null;

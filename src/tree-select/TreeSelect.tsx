@@ -50,6 +50,8 @@ const TreeSelect = forwardRef((props: TreeSelectProps, ref) => {
     size,
     max,
     data,
+    panelTopContent,
+    panelBottomContent,
     filter: rawFilter,
     filterable: rawFilterable,
     onClear,
@@ -265,28 +267,34 @@ const TreeSelect = forwardRef((props: TreeSelectProps, ref) => {
     if (readonly) return empty;
     if (showLoading) return loadingItem;
     return (
-      <Tree
-        ref={treeRef}
-        hover
-        transition
-        filter={handleFilter}
-        data={data}
-        disabled={disabled}
-        empty={empty}
-        expandOnClickNode={true}
-        {...(multiple
-          ? {
-              checkable: true,
-              onChange: handleMultiChange,
-              value: normalizedValue.map(({ value }) => value),
-            }
-          : {
-              activable: true,
-              actived: normalizedValue.map(({ value }) => value),
-              onActive: handleSingleChange,
-            })}
-        {...treeProps}
-      />
+      <>
+        {panelTopContent}
+        <Tree
+          ref={treeRef}
+          hover
+          transition
+          filter={handleFilter}
+          data={data}
+          disabled={disabled}
+          empty={empty}
+          expandOnClickNode={true}
+          allowFoldNodeOnFilter
+          keys={tKeys}
+          {...(multiple
+            ? {
+                checkable: true,
+                onChange: handleMultiChange,
+                value: normalizedValue.map(({ value }) => value),
+              }
+            : {
+                activable: true,
+                actived: normalizedValue.map(({ value }) => value),
+                onActive: handleSingleChange,
+              })}
+          {...treeProps}
+        />
+        {panelBottomContent}
+      </>
     );
   };
 

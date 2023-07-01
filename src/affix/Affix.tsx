@@ -5,6 +5,7 @@ import { TdAffixProps } from './type';
 import { getScrollContainer } from '../_util/dom';
 import useConfig from '../hooks/useConfig';
 import { affixDefaultProps } from './defaultProps';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface AffixProps extends TdAffixProps, StyledProps {}
 
@@ -13,7 +14,8 @@ export interface AffixRef {
 }
 
 const Affix = forwardRef<AffixRef, AffixProps>((props, ref) => {
-  const { children, content, zIndex, container, offsetBottom, offsetTop, className, style, onFixedChange } = props;
+  const { children, content, zIndex, container, offsetBottom, offsetTop, className, style, onFixedChange } =
+    useDefaultProps(props, affixDefaultProps);
 
   const { classPrefix } = useConfig();
 
@@ -60,7 +62,8 @@ const Affix = forwardRef<AffixRef, AffixProps>((props, ref) => {
 
         if (affixRef.current) {
           const affixed = fixedTop !== false;
-          const placeholderStatus = affixWrapRef.current.contains(placeholderEL.current);
+          let placeholderStatus = affixWrapRef.current.contains(placeholderEL.current);
+          const prePlaceholderStatus = placeholderStatus;
 
           if (affixed) {
             // 定位
@@ -78,16 +81,19 @@ const Affix = forwardRef<AffixRef, AffixProps>((props, ref) => {
               placeholderEL.current.style.width = `${wrapWidth}px`;
               placeholderEL.current.style.height = `${wrapHeight}px`;
               affixWrapRef.current.appendChild(placeholderEL.current);
+              placeholderStatus = true;
             }
           } else {
             affixRef.current.removeAttribute('class');
             affixRef.current.removeAttribute('style');
 
             // 删除占位节点
-            placeholderStatus && placeholderEL.current.remove();
+            if (placeholderStatus) {
+              placeholderEL.current.remove();
+              placeholderStatus = false;
+            }
           }
-
-          if (isFunction(onFixedChange)) {
+          if (prePlaceholderStatus !== placeholderStatus && isFunction(onFixedChange)) {
             onFixedChange(affixed, { top: +fixedTop });
           }
         }
@@ -129,6 +135,5 @@ const Affix = forwardRef<AffixRef, AffixProps>((props, ref) => {
 });
 
 Affix.displayName = 'Affix';
-Affix.defaultProps = affixDefaultProps;
 
 export default Affix;

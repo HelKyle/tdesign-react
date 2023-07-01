@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, MouseEvent } from 'react';
 import classnames from 'classnames';
 import { CSSTransition } from 'react-transition-group';
 import { useCollapseContext } from './CollapseContext';
@@ -7,13 +7,14 @@ import useConfig from '../hooks/useConfig';
 import { TdCollapsePanelProps } from './type';
 import { StyledProps } from '../common';
 import { collapsePanelDefaultProps } from './defaultProps';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface CollapsePanelProps extends TdCollapsePanelProps, StyledProps {
   children?: React.ReactNode;
   index?: number;
 }
 
-const CollapsePanel = (props: CollapsePanelProps) => {
+const CollapsePanel: React.FC<CollapsePanelProps> = (props) => {
   const {
     value,
     disabled,
@@ -25,7 +26,7 @@ const CollapsePanel = (props: CollapsePanelProps) => {
     headerRightContent,
     children,
     index,
-  } = props;
+  } = useDefaultProps<CollapsePanelProps>(props, collapsePanelDefaultProps);
   const {
     disabled: disableAll,
     defaultExpandAll,
@@ -44,7 +45,7 @@ const CollapsePanel = (props: CollapsePanelProps) => {
   const iconRef = useRef();
   const contentRef = useRef<HTMLDivElement>();
   const bodyRef = useRef<HTMLDivElement>();
-  const isDisabled = disabled || disableAll;
+  const isDisabled = disabled || !!disableAll;
 
   useEffect(() => {
     if (defaultExpandAll) {
@@ -63,11 +64,11 @@ const CollapsePanel = (props: CollapsePanelProps) => {
     className,
   );
 
-  const handleClick = (e) => {
+  const handleClick = (e: MouseEvent) => {
     const canExpand = (expandOnRowClick && e.currentTarget === headRef.current) || e.currentTarget === iconRef.current;
 
     if (canExpand && !isDisabled) {
-      updateCollapseValue(innerValue);
+      updateCollapseValue(innerValue, { e });
     }
     e.stopPropagation();
   };
@@ -162,6 +163,5 @@ const CollapsePanel = (props: CollapsePanelProps) => {
 };
 
 CollapsePanel.displayName = 'CollapsePanel';
-CollapsePanel.defaultProps = collapsePanelDefaultProps;
 
 export default CollapsePanel;

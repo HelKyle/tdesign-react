@@ -14,7 +14,6 @@ export interface ImageModelMiniProps {
   mirror: number;
   images: ImageInfo[];
   onClose: (context: { trigger: 'close-btn' | 'overlay' | 'esc'; e: MouseEvent<HTMLElement> | KeyboardEvent }) => void;
-  onScroll: (e: any) => void;
   imageScale: ImageScale;
   viewerScale: ImageViewerScale;
   rotateZ: number;
@@ -35,7 +34,7 @@ export interface ImageModelMiniProps {
   };
 }
 
-export const ImageModelMiniContent = (props: ImageModelMiniProps) => {
+export const ImageModelMiniContent: React.FC<ImageModelMiniProps> = (props) => {
   const { classPrefix } = useConfig();
 
   return (
@@ -52,7 +51,7 @@ export const ImageModelMiniContent = (props: ImageModelMiniProps) => {
   );
 };
 
-export const ImageModelMini = (props: ImageModelMiniProps) => {
+export const ImageModelMini: React.FC<ImageModelMiniProps> = (props) => {
   const {
     visible,
     title,

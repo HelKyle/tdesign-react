@@ -1,15 +1,23 @@
 import React, { forwardRef } from 'react';
 import dayjs from 'dayjs';
 import { StyledProps } from '../common';
-import { TdDatePickerPanelProps, DateValue, DatePickerYearChangeTrigger, DatePickerMonthChangeTrigger } from './type';
+import {
+  TdDatePickerPanelProps,
+  DateValue,
+  DatePickerYearChangeTrigger,
+  DatePickerMonthChangeTrigger,
+  PresetDate,
+} from './type';
 import SinglePanel from './panel/SinglePanel';
 import useSingleValue from './hooks/useSingleValue';
 import { formatDate, getDefaultFormat, parseToDayjs } from '../_common/js/date-picker/format';
 import { subtractMonth, addMonth, extractTimeObj } from '../_common/js/date-picker/utils';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface DatePickerPanelProps extends TdDatePickerPanelProps, StyledProps {}
 
-const DatePickerPanel = forwardRef<HTMLDivElement, DatePickerPanelProps>((props, ref) => {
+const DatePickerPanel = forwardRef<HTMLDivElement, DatePickerPanelProps>((originalProps, ref) => {
+  const props = useDefaultProps<DatePickerPanelProps>(originalProps, { mode: 'date', defaultValue: '' });
   const { value, onChange, time, setTime, month, setMonth, year, setYear, cacheValue, setCacheValue } =
     useSingleValue(props);
 
@@ -27,9 +35,9 @@ const DatePickerPanel = forwardRef<HTMLDivElement, DatePickerPanelProps>((props,
   } = props;
 
   const { format } = getDefaultFormat({
-    mode: props.mode,
+    mode,
     format: props.format,
-    enableTimePicker: props.enableTimePicker,
+    enableTimePicker,
   });
 
   // 日期点击
@@ -120,14 +128,17 @@ const DatePickerPanel = forwardRef<HTMLDivElement, DatePickerPanelProps>((props,
   }
 
   // 预设
-  function onPresetClick(presetValue: DateValue | (() => DateValue), { e, preset }) {
+  function onPresetClick(
+    presetValue: DateValue | (() => DateValue),
+    context: { preset: PresetDate; e: React.MouseEvent<HTMLDivElement> },
+  ) {
     const presetVal = typeof presetValue === 'function' ? presetValue() : presetValue;
     onChange(formatDate(presetVal, { format }), {
       dayjsValue: parseToDayjs(presetVal, format),
       trigger: 'preset',
     });
 
-    props.onPresetClick?.({ e, preset });
+    props.onPresetClick?.(context);
   }
 
   function onYearChange(year: number) {
@@ -177,9 +188,5 @@ const DatePickerPanel = forwardRef<HTMLDivElement, DatePickerPanelProps>((props,
 });
 
 DatePickerPanel.displayName = 'DatePickerPanel';
-DatePickerPanel.defaultProps = {
-  mode: 'date',
-  defaultValue: '',
-};
 
 export default DatePickerPanel;

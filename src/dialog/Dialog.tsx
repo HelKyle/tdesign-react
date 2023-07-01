@@ -15,17 +15,19 @@ import useDialogPosition from './hooks/useDialogPosition';
 import useDialogDrag from './hooks/useDialogDrag';
 import { parseValueToPx } from './utils';
 import log from '../_common/js/log';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface DialogProps extends TdDialogProps, StyledProps {
   isPlugin?: boolean; // 是否以插件形式调用
 }
 
-const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) => {
+const Dialog = forwardRef<DialogInstance, DialogProps>((originalProps, ref) => {
+  const props = useDefaultProps<DialogProps>(originalProps, dialogDefaultProps);
   const { classPrefix } = useConfig();
 
   const componentCls = `${classPrefix}-dialog`;
   const wrapRef = useRef<HTMLDivElement>();
-  const maskRef = useRef();
+  const maskRef = useRef<HTMLDivElement>();
   const contentClickRef = useRef(false);
   const dialogCardRef = useRef();
   const dialogPosition = useRef();
@@ -56,6 +58,7 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
     closeOnOverlayClick,
     destroyOnClose,
     preventScrollThrough,
+    onCloseBtnClick,
     ...restState
   } = state;
 
@@ -69,7 +72,9 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
   });
 
   useEffect(() => {
-    if (isPlugin) return;
+    if (isPlugin) {
+      return;
+    }
     // 插件式调用不会更新props, 只有组件式调用才会更新props
     setState((prevState) => ({ ...prevState, ...props }));
   }, [props, setState, isPlugin]);
@@ -113,6 +118,7 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
   };
 
   const handleClose = ({ e }) => {
+    onCloseBtnClick?.({ e });
     onClose?.({ e, trigger: 'close-btn' });
   };
 
@@ -139,8 +145,6 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
   };
 
   const onAnimateStart = () => {
-    onOpened?.();
-
     if (!wrapRef.current) return;
     wrapRef.current.style.display = 'block';
   };
@@ -171,6 +175,7 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
       unmountOnExit={destroyOnClose}
       nodeRef={portalRef}
       onEnter={onAnimateStart}
+      onEntered={onOpened}
       onExited={onAnimateLeave}
     >
       <Portal attach={attach} ref={portalRef}>
@@ -206,7 +211,7 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
                 <DialogCard
                   ref={dialogCardRef}
                   {...restState}
-                  style={{ ...style, width: parseValueToPx(width) }}
+                  style={{ ...style, width: parseValueToPx(width || style?.width) }}
                   onConfirm={onConfirm}
                   onCancel={handleCancel}
                   onCloseBtnClick={handleClose}
@@ -222,6 +227,5 @@ const Dialog = forwardRef((props: DialogProps, ref: React.Ref<DialogInstance>) =
 });
 
 Dialog.displayName = 'Dialog';
-Dialog.defaultProps = dialogDefaultProps;
 
 export default Dialog;

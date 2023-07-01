@@ -1,4 +1,14 @@
-import React, { useEffect, Ref, useMemo, KeyboardEvent, useRef, useCallback } from 'react';
+import React, {
+  useEffect,
+  Ref,
+  useMemo,
+  KeyboardEvent,
+  useRef,
+  useCallback,
+  Children,
+  cloneElement,
+  isValidElement,
+} from 'react';
 import classNames from 'classnames';
 import isFunction from 'lodash/isFunction';
 import get from 'lodash/get';
@@ -21,8 +31,9 @@ import { selectDefaultProps } from '../defaultProps';
 import { PopupVisibleChangeContext } from '../../popup';
 import useOptions from '../hooks/useOptions';
 import composeRefs from '../../_util/composeRefs';
+import { parseContentTNode } from '../../_util/parseTNode';
 
-export interface SelectProps extends TdSelectProps, StyledProps {
+export interface SelectProps<T = SelectOption> extends TdSelectProps<T>, StyledProps {
   // 子节点
   children?: React.ReactNode;
   onMouseEnter?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
@@ -186,7 +197,7 @@ const Select = forwardRefWithStatics(
       }
       if (creatable && isFunction(onCreate)) {
         if ((options as OptionsType).filter((option) => option.value === value).length === 0) {
-          onCreate(value);
+          onCreate(value as string); // 手动输入 此时为string
         }
       }
       // 处理onChange回调中的selectedOptions参数
@@ -214,8 +225,8 @@ const Select = forwardRefWithStatics(
         const upperValue = value.toUpperCase();
         filteredOptions = tmpPropOptions.filter((option) => (option?.label || '').toUpperCase().includes(upperValue)); // 不区分大小写
       }
-
-      if (creatable) {
+      const isSameLabelOptionExist = filteredOptions.find((option) => option.label === value);
+      if (creatable && !isSameLabelOptionExist) {
         filteredOptions = filteredOptions.concat([{ label: value, value }]);
       }
       setCurrentOptions(filteredOptions);
@@ -263,6 +274,13 @@ const Select = forwardRefWithStatics(
     };
     const getPopupInstance = useCallback(() => (selectInputRef as any).current?.getPopupContentElement(), []);
 
+    const childrenWithProps = Children.map(children, (child) => {
+      if (isValidElement(child)) {
+        const addedProps = { multiple };
+        return cloneElement(child, { ...addedProps });
+      }
+      return child;
+    });
     // 渲染主体内容
     const renderContent = () => {
       const popupContentProps = {
@@ -287,7 +305,7 @@ const Select = forwardRefWithStatics(
         getPopupInstance,
         scroll,
       };
-      return <PopupContent {...popupContentProps}>{children}</PopupContent>;
+      return <PopupContent {...popupContentProps}>{childrenWithProps}</PopupContent>;
     };
 
     const renderValueDisplay = () => {
@@ -305,6 +323,7 @@ const Select = forwardRefWithStatics(
               <Tag
                 key={key}
                 closable={!filterOption?.disabled && !disabled && !readonly}
+                size={size}
                 {...tagProps}
                 onClose={({ e }) => {
                   e.stopPropagation();
@@ -324,20 +343,19 @@ const Select = forwardRefWithStatics(
         return valueDisplay;
       }
       if (multiple) {
-        return ({ onClose }) => valueDisplay({ value: selectedLabel, onClose });
+        return ({ onClose }) => parseContentTNode(valueDisplay, { value: selectedLabel, onClose });
       }
-      return valueDisplay({ value: selectedLabel, onClose: noop });
+      return parseContentTNode(valueDisplay, { value: selectedLabel, onClose: noop });
     };
 
     const renderCollapsedItems = useMemo(
       () =>
         collapsedItems
-          ? () =>
-              collapsedItems({
-                value: selectedLabel,
-                collapsedSelectedItems: selectedLabel.slice(minCollapsedNum, selectedLabel.length),
-                count: selectedLabel.length - minCollapsedNum,
-              })
+          ? parseContentTNode(collapsedItems, {
+              value: selectedLabel,
+              collapsedSelectedItems: selectedLabel.slice(minCollapsedNum, selectedLabel.length),
+              count: selectedLabel.length - minCollapsedNum,
+            })
           : null,
       [selectedLabel, collapsedItems, minCollapsedNum],
     );
@@ -395,9 +413,10 @@ const Select = forwardRefWithStatics(
           placeholder={!multiple && showPopup && selectedLabel ? selectedLabel : placeholder || t(local.placeholder)}
           inputValue={inputValue}
           tagInputProps={{
+            size,
             ...tagInputProps,
           }}
-          tagProps={tagProps}
+          tagProps={{ size, ...tagProps }}
           inputProps={{
             size,
             ...inputProps,
@@ -415,7 +434,9 @@ const Select = forwardRefWithStatics(
           onInputChange={handleInputChange}
           onFocus={onFocus}
           onEnter={handleEnter}
-          onBlur={onBlur}
+          onBlur={(_, context) => {
+            onBlur?.({ value, e: context.e as React.FocusEvent<HTMLDivElement> });
+          }}
           onClear={(context) => {
             onClearValue(context);
           }}

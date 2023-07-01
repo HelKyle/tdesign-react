@@ -3,7 +3,7 @@ import classNames from 'classnames';
 import dayjs from 'dayjs';
 import useConfig from '../hooks/useConfig';
 import { StyledProps } from '../common';
-import { TdDateRangePickerProps } from './type';
+import { TdDateRangePickerProps, PresetDate } from './type';
 import { RangeInputPopup } from '../range-input';
 import RangePanel from './panel/RangePanel';
 import useRange from './hooks/useRange';
@@ -18,11 +18,14 @@ import {
 import { subtractMonth, addMonth, extractTimeObj } from '../_common/js/date-picker/utils';
 import { dateRangePickerDefaultProps } from './defaultProps';
 import log from '../_common/js/log';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface DateRangePickerProps extends TdDateRangePickerProps, StyledProps {}
 
-const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props, ref) => {
+const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((originalProps, ref) => {
   const { classPrefix, datePicker: globalDatePickerConfig } = useConfig();
+
+  const props = useDefaultProps<DateRangePickerProps>(originalProps, dateRangePickerDefaultProps);
 
   const {
     className,
@@ -80,7 +83,12 @@ const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props,
       setIsSelected(false);
       setCacheValue(formatDate(value || [], { format }));
       setTime(
-        formatTime(value || [dayjs().format(timeFormat), dayjs().format(timeFormat)], timeFormat, props.defaultTime),
+        formatTime(
+          value || [dayjs().format(timeFormat), dayjs().format(timeFormat)],
+          format,
+          timeFormat,
+          props.defaultTime,
+        ),
       );
 
       // 空数据重置为当前年月
@@ -249,8 +257,9 @@ const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props,
   }
 
   // 确定
-  function onConfirmClick() {
+  function onConfirmClick({ e }) {
     const nextValue = [...inputValue];
+    props?.onConfirm?.({ e, date: nextValue, partial: activeIndex ? 'end' : 'start' });
 
     const notValidIndex = nextValue.findIndex((v) => !v || !isValidDate(v, format));
 
@@ -270,18 +279,18 @@ const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props,
     }
 
     // 首次点击不关闭、确保两端都有有效值并且无时间选择器时点击后自动关闭
-    if (!isFirstValueSelected) {
+    if (!isFirstValueSelected || nextValue.length === 1) {
       let nextIndex = notValidIndex;
       if (nextIndex === -1) nextIndex = activeIndex ? 0 : 1;
       setActiveIndex(nextIndex);
       setIsFirstValueSelected(true);
-    } else {
+    } else if (nextValue.length === 2) {
       setPopupVisible(false);
     }
   }
 
   // 预设
-  function onPresetClick(preset: any) {
+  function onPresetClick(preset, context: { preset: PresetDate; e: React.MouseEvent<HTMLDivElement> }) {
     let presetValue = preset;
     if (typeof preset === 'function') {
       presetValue = preset();
@@ -293,6 +302,7 @@ const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props,
         dayjsValue: presetValue.map((p) => parseToDayjs(p, format)),
         trigger: 'preset',
       });
+      props.onPresetClick?.(context);
       setPopupVisible(false);
     }
   }
@@ -371,6 +381,5 @@ const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>((props,
 });
 
 DateRangePicker.displayName = 'DateRangePicker';
-DateRangePicker.defaultProps = dateRangePickerDefaultProps;
 
 export default DateRangePicker;

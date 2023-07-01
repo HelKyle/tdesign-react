@@ -3,18 +3,21 @@ import classNames from 'classnames';
 import dayjs from 'dayjs';
 import useConfig from '../hooks/useConfig';
 import { StyledProps } from '../common';
-import { TdDatePickerProps } from './type';
+import { TdDatePickerProps, PresetDate } from './type';
 import SelectInput from '../select-input';
 import SinglePanel from './panel/SinglePanel';
 import useSingle from './hooks/useSingle';
 import { parseToDayjs, getDefaultFormat, formatTime, formatDate } from '../_common/js/date-picker/format';
 import { subtractMonth, addMonth, extractTimeObj } from '../_common/js/date-picker/utils';
 import { datePickerDefaultProps } from './defaultProps';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface DatePickerProps extends TdDatePickerProps, StyledProps {}
 
-const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
+const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((originalProps, ref) => {
   const { classPrefix } = useConfig();
+
+  const props = useDefaultProps<DatePickerProps>(originalProps, datePickerDefaultProps);
 
   const {
     className,
@@ -53,10 +56,10 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
   } = useSingle(props);
 
   const { format, timeFormat, valueType } = getDefaultFormat({
-    mode: props.mode,
+    mode,
     format: props.format,
     valueType: props.valueType,
-    enableTimePicker: props.enableTimePicker,
+    enableTimePicker,
   });
 
   useEffect(() => {
@@ -67,7 +70,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
     if (popupVisible) {
       setYear(parseToDayjs(value, format).year());
       setMonth(parseToDayjs(value, format).month());
-      setTime(formatTime(value, timeFormat, defaultTime));
+      setTime(formatTime(value, format, timeFormat, defaultTime));
     } else {
       setIsHoverCell(false);
     }
@@ -148,8 +151,10 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
   }
 
   // 确定
-  function onConfirmClick() {
+  function onConfirmClick({ e }) {
     const nextValue = formatDate(inputValue, { format });
+    props?.onConfirm?.({ e, date: nextValue });
+
     if (nextValue) {
       onChange(formatDate(inputValue, { format, targetFormat: valueType }), {
         dayjsValue: parseToDayjs(inputValue, format),
@@ -162,7 +167,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
   }
 
   // 预设
-  function onPresetClick(preset: any) {
+  function onPresetClick(preset, context: { preset: PresetDate; e: React.MouseEvent<HTMLDivElement> }) {
     let presetValue = preset;
     if (typeof preset === 'function') {
       presetValue = preset();
@@ -171,6 +176,7 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
       dayjsValue: parseToDayjs(presetValue, format),
       trigger: 'preset',
     });
+    props.onPresetClick?.(context);
     setPopupVisible(false);
   }
 
@@ -225,6 +231,5 @@ const DatePicker = forwardRef<HTMLDivElement, DatePickerProps>((props, ref) => {
 });
 
 DatePicker.displayName = 'DatePicker';
-DatePicker.defaultProps = datePickerDefaultProps;
 
 export default DatePicker;

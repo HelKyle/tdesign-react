@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState, forwardRef, MutableRefObject, useCallback } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useCallback } from 'react';
 import classNames from 'classnames';
 import tinyColor from 'tinycolor2';
-
 import useCommonClassName from '../../../_util/useCommonClassName';
 import useControlled from '../../../hooks/useControlled';
 import { useLocaleReceiver } from '../../../locale/LocalReceiver';
@@ -27,7 +26,7 @@ import SwatchesPanel from './swatches';
 
 const mathRound = Math.round;
 
-const Panel = forwardRef((props: ColorPickerProps, ref: MutableRefObject<HTMLDivElement>) => {
+const Panel = forwardRef<HTMLDivElement, ColorPickerProps>((props, ref) => {
   const baseClassName = useClassName();
   const { STATUS } = useCommonClassName();
   const [local, t] = useLocaleReceiver('colorPicker');
@@ -47,9 +46,12 @@ const Panel = forwardRef((props: ColorPickerProps, ref: MutableRefObject<HTMLDiv
     showPrimaryColorPreview = true,
   } = props;
   const [innerValue, setInnerValue] = useControlled(props, 'value', onChange);
-  const colorInstanceRef = useRef<Color>(new Color(innerValue || DEFAULT_COLOR));
+  const [mode, setMode] = useState<TdColorModes>(colorModes?.length === 1 ? colorModes[0] : 'monochrome');
+  const isGradient = mode === 'linear-gradient'; // 判断是否为gradient模式
+
+  const defaultEmptyColor = isGradient ? DEFAULT_LINEAR_GRADIENT : DEFAULT_COLOR;
+  const colorInstanceRef = useRef<Color>(new Color(innerValue || defaultEmptyColor));
   const getmodeByColor = colorInstanceRef.current.isGradient ? 'linear-gradient' : 'monochrome';
-  const [mode, setMode] = useState<TdColorModes>(colorModes?.length === 1 ? colorModes[0] : getmodeByColor);
   const [updateId, setUpdateId] = useState(0);
   const update = useCallback(
     (value) => {
@@ -260,8 +262,8 @@ const Panel = forwardRef((props: ColorPickerProps, ref: MutableRefObject<HTMLDiv
           console.warn('该模式不支持渐变色');
         }
       } else if (mode === 'linear-gradient') {
-        color.updateStates(value);
-        color.updateCurrentGradientColor();
+        setMode('monochrome');
+        color.update(value);
       } else {
         color.update(value);
       }
@@ -294,8 +296,6 @@ const Panel = forwardRef((props: ColorPickerProps, ref: MutableRefObject<HTMLDiv
       </>
     );
   });
-
-  const isGradient = mode === 'linear-gradient';
 
   return (
     <div

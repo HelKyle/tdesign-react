@@ -7,12 +7,14 @@ import Loading from '../loading';
 import { TdButtonProps } from './type';
 import { buttonDefaultProps } from './defaultProps';
 import parseTNode from '../_util/parseTNode';
+import useDefaultProps from '../hooks/useDefaultProps';
 
 export interface ButtonProps
   extends TdButtonProps,
     Omit<React.AllHTMLAttributes<HTMLElement>, 'content' | 'shape' | 'size' | 'type'> {}
 
-const Button = forwardRef((props: ButtonProps, ref: React.RefObject<HTMLElement>) => {
+const Button = forwardRef((originProps: ButtonProps, ref: React.RefObject<HTMLElement>) => {
+  const props = useDefaultProps(originProps, buttonDefaultProps);
   const {
     type,
     theme,
@@ -53,7 +55,7 @@ const Button = forwardRef((props: ButtonProps, ref: React.RefObject<HTMLElement>
   }, [theme, variant]);
 
   const renderTag = useMemo(() => {
-    if (!tag && href) return 'a';
+    if (!tag && href && !disabled) return 'a';
     if (!tag && disabled) return 'div';
     return tag || 'button';
   }, [tag, href, disabled]);
@@ -94,6 +96,5 @@ const Button = forwardRef((props: ButtonProps, ref: React.RefObject<HTMLElement>
 });
 
 Button.displayName = 'Button';
-Button.defaultProps = buttonDefaultProps;
 
 export default Button;
